@@ -1,0 +1,14 @@
+command:
+  - npm
+  - run
+  - start
+
+env:
+  - name: SERVING_ENDPOINT
+    valueFrom: serving-endpoint
+  - name: AGENT_REQUEST_FORMAT
+    value: responses
+
+# Configure Databricks Apps user authorization in the app UI:
+#   scope: model-serving
+# The backend reads x-forwarded-access-token and uses it directly for inference.
