@@ -1,5 +1,5 @@
 import { AlertCircle, Bot, Loader2, RefreshCcw, Send, UserRound } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const emptyConfig = {
   databricksHost: "",
