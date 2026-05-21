@@ -360,6 +360,225 @@ function AppSidebar({ threads, activeId, onSelect, onNew, onDelete, onRename }) 
   );
 }
 
+/* ── Rich Message Content Parser ── */
+
+function formatNumber(str) {
+  const num = Number(str);
+  if (isNaN(num)) return str;
+  // Format with commas and up to 2 decimal places
+  const formatted = num.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+  return formatted;
+}
+
+function parseTable(lines) {
+  // lines = array of pipe-delimited rows
+  // First row = header, second row = separator, rest = data
+  const parseRow = (line) =>
+    line
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((cell) => cell.trim());
+
+  const headers = parseRow(lines[0]);
+  // Skip separator row (lines[1])
+  const dataRows = lines.slice(2).map(parseRow);
+
+  // Detect if a column looks numeric
+  const isNumericCol = headers.map((_, i) =>
+    dataRows.length > 0 && dataRows.every((row) => row[i] === undefined || row[i] === "" || !isNaN(Number(row[i])))
+  );
+
+  return { headers, dataRows, isNumericCol };
+}
+
+function RichMessageContent({ text }) {
+  const blocks = useMemo(() => {
+    if (!text) return [{ type: "text", content: "" }];
+
+    const result = [];
+    const lines = text.split("\n");
+    let i = 0;
+    let currentText = [];
+
+    const flushText = () => {
+      if (currentText.length > 0) {
+        result.push({ type: "text", content: currentText.join("\n") });
+        currentText = [];
+      }
+    };
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      // Fenced code block (```)
+      if (line.trimStart().startsWith("```")) {
+        flushText();
+        const lang = line.trimStart().slice(3).trim();
+        const codeLines = [];
+        i++;
+        while (i < lines.length && !lines[i].trimStart().startsWith("```")) {
+          codeLines.push(lines[i]);
+          i++;
+        }
+        result.push({ type: "code-block", lang, content: codeLines.join("\n") });
+        i++; // skip closing ```
+        continue;
+      }
+
+      // Table detection: line starts/ends with | or has multiple |
+      const isTableRow = (l) => {
+        const trimmed = l.trim();
+        return (trimmed.startsWith("|") || trimmed.includes("|")) &&
+          (trimmed.match(/\|/g) || []).length >= 2;
+      };
+      const isSeparator = (l) => /^\|?[\s-:|]+\|?$/.test(l.trim());
+
+      if (isTableRow(line) && i + 1 < lines.length && isSeparator(lines[i + 1])) {
+        flushText();
+        const tableLines = [];
+        while (i < lines.length && (isTableRow(lines[i]) || isSeparator(lines[i]))) {
+          tableLines.push(lines[i]);
+          i++;
+        }
+        if (tableLines.length >= 2) {
+          result.push({ type: "table", ...parseTable(tableLines) });
+        } else {
+          currentText.push(...tableLines);
+        }
+        continue;
+      }
+
+      currentText.push(line);
+      i++;
+    }
+
+    flushText();
+    return result;
+  }, [text]);
+
+  return (
+    <div className="rich-content">
+      {blocks.map((block, idx) => {
+        if (block.type === "code-block") {
+          return (
+            <div key={idx} className="rich-code-block">
+              {block.lang && <div className="rich-code-lang">{block.lang}</div>}
+              <pre><code>{block.content}</code></pre>
+            </div>
+          );
+        }
+
+        if (block.type === "table") {
+          return (
+            <div key={idx} className="rich-table-wrapper">
+              <table className="rich-table">
+                <thead>
+                  <tr>
+                    {block.headers.map((h, hi) => (
+                      <th key={hi} className={block.isNumericCol[hi] ? "num-col" : ""}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {block.dataRows.map((row, ri) => (
+                    <tr key={ri}>
+                      {row.map((cell, ci) => (
+                        <td key={ci} className={block.isNumericCol[ci] ? "num-col" : ""}>
+                          {block.isNumericCol[ci] ? formatNumber(cell) : cell}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        // "text" block — render inline formatting
+        return <RichTextBlock key={idx} content={block.content} />;
+      })}
+    </div>
+  );
+}
+
+function RichTextBlock({ content }) {
+  // Split into paragraphs by double newline
+  const paragraphs = content.split(/\n{2,}/);
+
+  return (
+    <>
+      {paragraphs.map((para, pi) => {
+        const trimmed = para.trim();
+        if (!trimmed) return null;
+
+        // Unordered list
+        const ulLines = trimmed.split("\n");
+        if (ulLines.every((l) => /^[\s]*[-*•]\s/.test(l))) {
+          return (
+            <ul key={pi} className="rich-ul">
+              {ulLines.map((l, li) => (
+                <li key={li}>{renderInline(l.replace(/^[\s]*[-*•]\s+/, ""))}</li>
+              ))}
+            </ul>
+          );
+        }
+
+        // Ordered list
+        if (ulLines.every((l) => /^[\s]*\d+[.)]\s/.test(l))) {
+          return (
+            <ol key={pi} className="rich-ol">
+              {ulLines.map((l, li) => (
+                <li key={li}>{renderInline(l.replace(/^[\s]*\d+[.)]\s+/, ""))}</li>
+              ))}
+            </ol>
+          );
+        }
+
+        return (
+          <p key={pi} className="rich-para">
+            {renderInline(trimmed.replace(/\n/g, " "))}
+          </p>
+        );
+      })}
+    </>
+  );
+}
+
+function renderInline(text) {
+  // Split by inline patterns: **bold**, `code`
+  const parts = [];
+  const regex = /(\*\*(.+?)\*\*|`([^`]+?)`)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(<React.Fragment key={`t${lastIndex}`}>{text.slice(lastIndex, match.index)}</React.Fragment>);
+    }
+    if (match[2]) {
+      // Bold
+      parts.push(<strong key={`b${match.index}`} className="rich-bold">{match[2]}</strong>);
+    } else if (match[3]) {
+      // Inline code
+      parts.push(<code key={`c${match.index}`} className="rich-inline-code">{match[3]}</code>);
+    }
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(<React.Fragment key={`t${lastIndex}`}>{text.slice(lastIndex)}</React.Fragment>);
+  }
+
+  return parts.length > 0 ? parts : text;
+}
+
 /* ── Message Bubble ── */
 function MessageBubble({ message }) {
   const isAssistant = message.role === "assistant";
@@ -367,7 +586,13 @@ function MessageBubble({ message }) {
     <div className={`message-row ${isAssistant ? "assistant" : "user"} fade-in`}>
       <div className="message-bubble">
         <div className="message-role">{isAssistant ? "Assistant" : "You"}</div>
-        <div className="message-text">{message.content}</div>
+        {isAssistant ? (
+          <div className="message-text">
+            <RichMessageContent text={message.content} />
+          </div>
+        ) : (
+          <div className="message-text">{message.content}</div>
+        )}
       </div>
     </div>
   );

@@ -720,6 +720,225 @@ select {
   line-height: 1.6;
 }
 
+/* Reset pre-wrap inside rich content so parsed blocks control whitespace */
+.message-text .rich-content {
+  white-space: normal;
+}
+
+/* ═══════════════════════════════════════════
+   RICH MESSAGE CONTENT
+   ═══════════════════════════════════════════ */
+
+/* ── Paragraphs ── */
+.rich-para {
+  margin: 0 0 12px;
+  line-height: 1.65;
+}
+
+.rich-para:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Bold text ── */
+.rich-bold {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.dark .rich-bold {
+  color: oklch(0.82 0.12 250);
+}
+
+/* ── Inline code ── */
+.rich-inline-code {
+  display: inline;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.85em;
+  color: var(--fg);
+}
+
+/* ── Code block ── */
+.rich-code-block {
+  margin: 12px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: oklch(0.15 0.02 260);
+}
+
+:root .rich-code-block {
+  background: oklch(0.97 0.005 250);
+}
+
+.dark .rich-code-block {
+  background: oklch(0.15 0.02 260);
+}
+
+.rich-code-lang {
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted-fg);
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
+}
+
+.rich-code-block pre {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--fg);
+}
+
+.rich-code-block pre code {
+  font: inherit;
+  color: inherit;
+}
+
+/* ── Table ── */
+.rich-table-wrapper {
+  margin: 14px 0;
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.dark .rich-table-wrapper {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+.rich-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.rich-table thead tr {
+  background: linear-gradient(135deg, var(--primary) 0%, oklch(from var(--primary) calc(l + 0.08) c h) 100%);
+}
+
+:root .rich-table thead tr {
+  background: linear-gradient(135deg, oklch(0.94 0.02 255) 0%, oklch(0.96 0.01 250) 100%);
+}
+
+.dark .rich-table thead tr {
+  background: linear-gradient(135deg, oklch(0.28 0.04 260) 0%, oklch(0.32 0.05 255) 100%);
+}
+
+.rich-table th {
+  padding: 11px 16px;
+  font-weight: 600;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: left;
+  white-space: nowrap;
+}
+
+:root .rich-table th {
+  color: oklch(0.35 0.03 260);
+  border-bottom: 2px solid var(--border);
+}
+
+.dark .rich-table th {
+  color: oklch(0.82 0.04 250);
+  border-bottom: 2px solid oklch(1 0 0 / 6%);
+}
+
+.rich-table th.num-col {
+  text-align: right;
+}
+
+.rich-table td {
+  padding: 10px 16px;
+  color: var(--fg);
+  border-bottom: 1px solid var(--border);
+  transition: background 120ms ease;
+}
+
+.rich-table td.num-col {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.dark .rich-table td.num-col {
+  color: oklch(0.78 0.13 170);
+}
+
+:root .rich-table td.num-col {
+  color: oklch(0.38 0.12 170);
+}
+
+.rich-table tbody tr:nth-child(even) {
+  background: var(--muted);
+}
+
+:root .rich-table tbody tr:nth-child(even) {
+  background: oklch(0.98 0.003 250);
+}
+
+.dark .rich-table tbody tr:nth-child(even) {
+  background: oklch(0.20 0.025 260);
+}
+
+.rich-table tbody tr:hover {
+  background: oklch(from var(--primary) l c h / 8%);
+}
+
+:root .rich-table tbody tr:hover {
+  background: oklch(0.65 0.13 250 / 6%);
+}
+
+.dark .rich-table tbody tr:hover {
+  background: oklch(0.65 0.13 250 / 10%);
+}
+
+.rich-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── Lists ── */
+.rich-ul,
+.rich-ol {
+  margin: 8px 0 12px;
+  padding-left: 22px;
+  line-height: 1.65;
+}
+
+.rich-ul:last-child,
+.rich-ol:last-child {
+  margin-bottom: 0;
+}
+
+.rich-ul li,
+.rich-ol li {
+  margin-bottom: 4px;
+  padding-left: 4px;
+}
+
+.rich-ul li::marker {
+  color: var(--primary);
+}
+
+.rich-ol li::marker {
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
 /* Loading dots */
 .loading-dots {
   display: flex;

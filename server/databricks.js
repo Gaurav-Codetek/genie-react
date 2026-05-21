@@ -144,6 +144,32 @@ function extractPredictionsText(predictions) {
     .trim();
 }
 
+/**
+ * Post-process extracted agent text:
+ * - Strip <name>...</name> orchestration tags
+ * - Remove lines that are only internal labels
+ * - Collapse 3+ consecutive newlines to 2
+ */
+export function cleanAgentText(text) {
+  if (!text) return "";
+
+  return text
+    // Remove <name>...</name> tags and surrounding whitespace
+    .replace(/\s*<name>[^<]*<\/name>\s*/g, "\n")
+    // Remove standalone orchestration-style lines (e.g. just "IC_Plan" or "space-orchestration")
+    .replace(/^[ \t]*[A-Za-z0-9_-]+(?:[-_][A-Za-z0-9_-]+){0,5}[ \t]*$/gm, (match) => {
+      // Only strip if it looks like an internal label (no spaces, short, alphanumeric + dashes/underscores)
+      const trimmed = match.trim();
+      if (/^[a-z0-9_-]+$/i.test(trimmed) && trimmed.length < 80 && trimmed.includes("-")) {
+        return "";
+      }
+      return match;
+    })
+    // Collapse 3+ consecutive newlines to 2
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function extractAgentText(payload) {
   if (payload == null) {
     return "";
@@ -271,7 +297,7 @@ export async function invokeServingEndpoint({ messages, token }) {
     }
 
     return {
-      text: extractAgentText(rawResponse) || "The endpoint returned a response, but no displayable text was found.",
+      text: cleanAgentText(extractAgentText(rawResponse)) || "The endpoint returned a response, but no displayable text was found.",
       rawResponse,
       request: {
         format: requestFormat,
