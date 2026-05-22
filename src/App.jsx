@@ -429,6 +429,68 @@ function RichMessageContent({ text }) {
         continue;
       }
 
+      // HTML Table detection
+      if (line.includes("<table")) {
+        const tableStartIndex = line.indexOf("<table");
+        if (tableStartIndex > 0) {
+           currentText.push(line.slice(0, tableStartIndex));
+        }
+        flushText();
+        
+        let tableHtml = line.slice(tableStartIndex);
+        while (i < lines.length && !tableHtml.includes("</table>")) {
+          i++;
+          if (i < lines.length) tableHtml += "\n" + lines[i];
+        }
+        
+        const tableEndIndex = tableHtml.indexOf("</table>") + 8;
+        const afterTable = tableHtml.slice(tableEndIndex);
+        tableHtml = tableHtml.slice(0, tableEndIndex);
+
+        try {
+          const doc = new DOMParser().parseFromString(tableHtml, 'text/html');
+          const table = doc.querySelector('table');
+          if (table) {
+            let headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent.trim());
+            let rows = Array.from(table.querySelectorAll('tr')).map(tr => 
+                Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim())
+            ).filter(row => row.length > 0);
+
+            if (headers.length === 0 && rows.length > 0) {
+                // If no <th>, use the first row as headers if it makes sense, but we'll just keep it as data if not.
+                // Let's just use the first tr as headers
+                const firstTr = table.querySelector('tr');
+                if (firstTr) {
+                   headers = Array.from(firstTr.querySelectorAll('td, th')).map(td => td.textContent.trim());
+                   rows.shift();
+                }
+            }
+            const isNumericCol = headers.map((_, colIdx) =>
+              rows.length > 0 && rows.every((row) => row[colIdx] === undefined || row[colIdx] === "" || !isNaN(Number(row[colIdx])))
+            );
+            result.push({ type: "table", headers, dataRows: rows, isNumericCol });
+          }
+        } catch(e) {
+          // fallback
+          currentText.push(tableHtml);
+        }
+
+        if (afterTable.trim()) {
+           currentText.push(afterTable);
+        }
+        i++;
+        continue;
+      }
+
+      // Headings
+      const headingMatch = line.match(/^(#{1,6})\s+(.*)/);
+      if (headingMatch) {
+        flushText();
+        result.push({ type: "heading", level: headingMatch[1].length, content: headingMatch[2] });
+        i++;
+        continue;
+      }
+
       // Table detection: line starts/ends with | or has multiple |
       const isTableRow = (l) => {
         const trimmed = l.trim();
@@ -463,6 +525,11 @@ function RichMessageContent({ text }) {
   return (
     <div className="rich-content">
       {blocks.map((block, idx) => {
+        if (block.type === "heading") {
+           const Tag = `h${block.level}`;
+           return <Tag key={idx} className="rich-heading">{renderInline(block.content)}</Tag>;
+        }
+
         if (block.type === "code-block") {
           return (
             <div key={idx} className="rich-code-block">
@@ -480,7 +547,7 @@ function RichMessageContent({ text }) {
                   <tr>
                     {block.headers.map((h, hi) => (
                       <th key={hi} className={block.isNumericCol[hi] ? "num-col" : ""}>
-                        {h}
+                        {renderInline(h)}
                       </th>
                     ))}
                   </tr>
@@ -490,7 +557,7 @@ function RichMessageContent({ text }) {
                     <tr key={ri}>
                       {row.map((cell, ci) => (
                         <td key={ci} className={block.isNumericCol[ci] ? "num-col" : ""}>
-                          {block.isNumericCol[ci] ? formatNumber(cell) : cell}
+                          {block.isNumericCol[ci] ? formatNumber(cell) : renderInline(cell)}
                         </td>
                       ))}
                     </tr>
@@ -541,6 +608,24 @@ function RichTextBlock({ content }) {
           );
         }
 
+        // Footnote definition block at the bottom
+        if (trimmed.startsWith("[^")) {
+           const footnoteLines = trimmed.split("\n");
+           if (footnoteLines.every(l => /^\[\^.+?\]:/.test(l.trim()))) {
+               return (
+                   <div key={pi} className="rich-footnotes">
+                       {footnoteLines.map((l, li) => {
+                           const match = l.match(/^(\[\^.+?\]):\s*(.*)/);
+                           if (match) {
+                               return <div key={li} className="rich-footnote-def"><strong>{match[1]}</strong>: {renderInline(match[2])}</div>;
+                           }
+                           return <div key={li}>{renderInline(l)}</div>;
+                       })}
+                   </div>
+               );
+           }
+        }
+
         return (
           <p key={pi} className="rich-para">
             {renderInline(trimmed.replace(/\n/g, " "))}
@@ -552,9 +637,14 @@ function RichTextBlock({ content }) {
 }
 
 function renderInline(text) {
-  // Split by inline patterns: **bold**, `code`
+  // Split by inline patterns: **bold**, *italic*, _italic_, `code`, [^footnote]
   const parts = [];
-  const regex = /(\*\*(.+?)\*\*|`([^`]+?)`)/g;
+  // Regex matches:
+  // 1: **bold**
+  // 3: *italic* or _italic_
+  // 5: `code`
+  // 7: [^footnote]
+  const regex = /(\*\*(.+?)\*\*|([*_])([^*_]+?)\3|`([^`]+?)`|(\[\^[^\]]+\]))/g;
   let lastIndex = 0;
   let match;
 
@@ -565,9 +655,15 @@ function renderInline(text) {
     if (match[2]) {
       // Bold
       parts.push(<strong key={`b${match.index}`} className="rich-bold">{match[2]}</strong>);
-    } else if (match[3]) {
+    } else if (match[4]) {
+      // Italic
+      parts.push(<em key={`i${match.index}`} className="rich-italic">{match[4]}</em>);
+    } else if (match[5]) {
       // Inline code
-      parts.push(<code key={`c${match.index}`} className="rich-inline-code">{match[3]}</code>);
+      parts.push(<code key={`c${match.index}`} className="rich-inline-code">{match[5]}</code>);
+    } else if (match[6]) {
+      // Footnote reference
+      parts.push(<sup key={`f${match.index}`} className="rich-footnote-ref">{match[6]}</sup>);
     }
     lastIndex = match.index + match[0].length;
   }

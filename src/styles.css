@@ -739,6 +739,23 @@ select {
   margin-bottom: 0;
 }
 
+/* ── Headings ── */
+.rich-heading {
+  margin: 20px 0 12px;
+  font-weight: 600;
+  color: var(--fg);
+  line-height: 1.3;
+}
+
+.rich-heading:first-child {
+  margin-top: 0;
+}
+
+h1.rich-heading { font-size: 1.5em; }
+h2.rich-heading { font-size: 1.3em; }
+h3.rich-heading { font-size: 1.15em; }
+h4.rich-heading { font-size: 1em; }
+
 /* ── Bold text ── */
 .rich-bold {
   font-weight: 600;
@@ -747,6 +764,33 @@ select {
 
 .dark .rich-bold {
   color: oklch(0.82 0.12 250);
+}
+
+/* ── Italic text ── */
+.rich-italic {
+  font-style: italic;
+}
+
+/* ── Footnotes ── */
+.rich-footnote-ref {
+  font-size: 0.75em;
+  vertical-align: super;
+  color: var(--primary);
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.rich-footnotes {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 0.9em;
+  color: var(--muted-fg);
+}
+
+.rich-footnote-def {
+  margin-bottom: 8px;
+  line-height: 1.5;
 }
 
 /* ── Inline code ── */
